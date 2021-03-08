@@ -1,5 +1,6 @@
 package com.redhat.insights.expandjsonsmt;
 
+import java.util.Iterator;
 import java.util.Map.Entry;
 
 import org.apache.kafka.connect.errors.ConnectException;
@@ -22,14 +23,14 @@ class SchemaParser {
      * @param doc Parsed document or null.
      */
     static Schema bsonDocument2Schema(BsonDocument doc) {
-        return bsonDocument2SchemaBuilder(doc).build();
+        return bsonDocument2SchemaBuilder(doc, false).build();
     }
 
-    private static SchemaBuilder bsonDocument2SchemaBuilder(BsonDocument doc) {
+    private static SchemaBuilder bsonDocument2SchemaBuilder(BsonDocument doc, boolean lastPass) {
         final SchemaBuilder schemaBuilder = SchemaBuilder.struct().optional();
         if (doc != null) {
             for(Entry<String, BsonValue> entry : doc.entrySet()) {
-                addFieldSchema(entry, schemaBuilder);
+                addFieldSchema(entry, schemaBuilder, lastPass);
             }
         }
 
@@ -37,11 +38,11 @@ class SchemaParser {
     }
 
 
-    private static void addFieldSchema(Entry<String, BsonValue> keyValuesforSchema, SchemaBuilder builder) {
+    private static void addFieldSchema(Entry<String, BsonValue> keyValuesforSchema, SchemaBuilder builder, boolean lastPass) {
         try {
             final String key = keyValuesforSchema.getKey();
             final BsonValue bsonValue = keyValuesforSchema.getValue();
-            final Schema schema = bsonValue2Schema(bsonValue);
+            final Schema schema = bsonValue2Schema(bsonValue, lastPass);
             if (schema != null) {
                 builder.field(key, schema);
             }
@@ -50,7 +51,7 @@ class SchemaParser {
         }
     }
 
-    private static Schema bsonValue2Schema(BsonValue bsonValue) {
+    private static Schema bsonValue2Schema(BsonValue bsonValue, boolean lastPass) {
         switch (bsonValue.getBsonType()) {
         case NULL:
         case STRING:
@@ -80,7 +81,11 @@ class SchemaParser {
             return bsonDocument2Schema(bsonValue.asDocument());
 
         case ARRAY:
-            return SchemaBuilder.array(getArrayMemberSchema(bsonValue.asArray())).optional().build();
+            Schema arraySchema = getArrayMemberSchema(bsonValue.asArray(), lastPass);
+            if (arraySchema == null) {
+                return null;
+            }
+            return SchemaBuilder.array(arraySchema).optional().build();
 
         default:
             return null;
@@ -111,9 +116,14 @@ class SchemaParser {
         return bsonValue;
     }
 
-    private static Schema getArrayMemberSchema(BsonArray bsonArr) {
-        if (bsonArr.isEmpty()){
-            return Schema.OPTIONAL_STRING_SCHEMA;
+    private static Schema getArrayMemberSchema(BsonArray bsonArr, boolean lastPass) {
+        if (lastPass) {
+            if (bsonArr.isEmpty()) {
+                return Schema.OPTIONAL_STRING_SCHEMA;
+            }
+        }
+        if (bsonArr.isEmpty()) {
+            return null;
         }
 
         final BsonValue elementSample = getArrayElement(bsonArr);
@@ -121,7 +131,7 @@ class SchemaParser {
             return buildDocumentUnionSchema(bsonArr);
         }
 
-        final Schema schema = bsonValue2Schema(elementSample);
+        final Schema schema = bsonValue2Schema(elementSample, lastPass);
         if (schema == null) {
             throw new ConnectException("Array has unrecognized member schema.");
         }
@@ -134,21 +144,28 @@ class SchemaParser {
      * of the document types
      */
     private static Schema buildDocumentUnionSchema(BsonArray array) {
+        boolean lastPass = false;
         SchemaBuilder builder = null;
 
-        for (BsonValue element : array.asArray()) {
+        Iterator<BsonValue> iterator = array.iterator();
+        while (iterator.hasNext()) {
+            BsonValue element = iterator.next();
+            if (!iterator.hasNext()) {
+                lastPass = true;
+            }
             if (!element.isDocument()) {
                 continue;
             }
 
             if (builder == null) {
-                builder = bsonDocument2SchemaBuilder(element.asDocument());
+                builder = bsonDocument2SchemaBuilder(element.asDocument(), lastPass);
                 continue;
             }
 
             for(Entry<String, BsonValue> entry : element.asDocument().entrySet()) {
                 if (builder.field(entry.getKey()) == null) {
-                    addFieldSchema(entry, builder);
+
+                    addFieldSchema(entry, builder, lastPass);
                 }
             }
         }

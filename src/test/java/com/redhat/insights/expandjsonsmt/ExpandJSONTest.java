@@ -16,6 +16,7 @@
  */
 package com.redhat.insights.expandjsonsmt;
 
+import org.apache.kafka.connect.data.ConnectSchema;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
@@ -291,5 +292,71 @@ public class ExpandJSONTest {
         assertEquals(1, updatedValue.schema().fields().size());
         assertEquals("USA", updatedValue.getStruct("obj1").getStruct("obj2").getStruct("obj3")
                 .getString("country"));
+    }
+
+    // Test Suite for inferring arrays of objects
+    @Test
+    public void emptyArrayFirst() {
+        final Map<String, String> props = new HashMap<>();
+        props.put("sourceFields", "json");
+
+        xform.configure(props);
+
+        final Schema schema = SchemaBuilder.struct()
+                .field("json", SchemaBuilder.string());
+
+        final Struct json = new Struct(schema);
+        //json.put("json", "{\"_id\": {\"$oid\": \"60415e45bf2b20ee488ad885\"}, \"revisionAuthor\": \"Eric Hamilton\", \"hed\": \"Homepage V2\", \"bundleType\": \"homepage\", \"body\": \"\", \"channel\": \"\", \"subChannel\": \"\", \"tags\": [], \"contentSource\": \"web\", \"containers\": [{\"id\": \"59e91a3de116ca000b2d979c\", \"curationContainerType\": \"hero\", \"hed\": \"\", \"dek\": \"\", \"photoId\": null, \"layout\": \"\", \"itemLimit\": 1, \"curations\": [{\"hed\": \"Munroe Bergdorf’s Guide to Being a Black Trans Woman on the Internet\", \"dek\": \"The outspoken model reveals her secrets to staying safe, sane, and strong online.\", \"contentId\": \"59e790f2f64b9e000ba92c26\", \"contentModel\": \"article\", \"index\": 0, \"type\": \"contentcuration\", \"id\": \"5aabea612d490e0010f2030a\"}], \"searches\": [], \"type\": \"curationcontainer\"}, {\"id\": \"59e91a3de116ca000b2d979d\", \"curationContainerType\": \"river\", \"hed\": \"\", \"dek\": \"\", \"photoId\": null, \"layout\": \"\", \"itemLimit\": 10, \"curations\": [], \"searches\": [{\"q\": \"\", \"sort\": \"publishDate desc\", \"filters\": {\"tags\": [], \"types\": [\"article\"], \"channel\": [], \"subchannel\": [], \"categoryIds\": [], \"contributor\": [], \"nottags\": [], \"contentSource\": [], \"issueDate\": []}, \"type\": \"curatedsearch\", \"id\": \"5aabea612d490e0010f2030b\"}], \"type\": \"curationcontainer\"}, {\"id\": \"5a95b7c5c32f28001036be58\", \"curationContainerType\": \"trio\", \"hed\": \"\", \"dek\": \"\", \"photoId\": null, \"layout\": \"\", \"itemLimit\": 3, \"curations\": [], \"searches\": [], \"type\": \"curationcontainer\"}], \"dek\": \"\", \"promoHed\": \"News, Culture and Current Events Coverage for the LGBTQ Community\", \"promoDek\": \"Through the lens of today’s LGBTQ community, Them provides news and commentary on topics ranging from culture and politics to style and entertainment.\", \"seoTitle\": \"News, Culture and Current Events Coverage for the LGBTQ Community\", \"seoDescription\": \"Through the lens of today’s LGBTQ community, Them provides news and commentary on topics ranging from culture and politics to style and entertainment.\", \"socialTitle\": \"\", \"socialDescription\": \"\", \"issueDate\": \"\", \"rubric\": \"\", \"meta\": {\"collectionName\": \"bundles\", \"modelName\": \"bundle\", \"publishable\": true, \"identifiable\": true, \"image\": false, \"archived\": false, \"hallable\": false, \"hierarchical\": false, \"affiliatizable\": false, \"translatable\": false}, \"isNative\": false, \"bylineOption\": \"\", \"bylineVariant\": \"\", \"id\": {\"$oid\": \"60415e45216a87d967da13df\"}, \"revision\": 0, \"createdAt\": {\"$date\": 1614896709620}, \"modifiedAt\": {\"$date\": 1614896709620}, \"revisionCreatedAt\": {\"$date\": 1614896709620}, \"isProgrammatic\": false, \"organizationId\": \"4gKgcF6xmMhCNaJTUs2vi3xw8yBn\"}");
+        //json.put("json", "{\"containers\": [{\"id\": \"59e91a3de116ca000b2d979c\", \"curationContainerType\": \"hero\", \"hed\": \"\", \"dek\": \"\", \"photoId\": null, \"layout\": \"\", \"itemLimit\": 1, \"curations\": [{\"hed\": \"Munroe Bergdorf’s Guide to Being a Black Trans Woman on the Internet\", \"dek\": \"The outspoken model reveals her secrets to staying safe, sane, and strong online.\", \"contentId\": \"59e790f2f64b9e000ba92c26\", \"contentModel\": \"article\", \"index\": 0, \"type\": \"contentcuration\", \"id\": \"5aabea612d490e0010f2030a\"}], \"searches\": [], \"type\": \"curationcontainer\"}, {\"id\": \"59e91a3de116ca000b2d979d\", \"curationContainerType\": \"river\", \"hed\": \"\", \"dek\": \"\", \"photoId\": null, \"layout\": \"\", \"itemLimit\": 10, \"curations\": [], \"searches\": [{\"q\": \"\", \"sort\": \"publishDate desc\", \"filters\": {\"tags\": [], \"types\": [\"article\"], \"channel\": [], \"subchannel\": [], \"categoryIds\": [], \"contributor\": [], \"nottags\": [], \"contentSource\": [], \"issueDate\": []}, \"type\": \"curatedsearch\", \"id\": \"5aabea612d490e0010f2030b\"}], \"type\": \"curationcontainer\"}, {\"id\": \"5a95b7c5c32f28001036be58\", \"curationContainerType\": \"trio\", \"hed\": \"\", \"dek\": \"\", \"photoId\": null, \"layout\": \"\", \"itemLimit\": 3, \"curations\": [], \"searches\": [], \"type\": \"curationcontainer\"}] }");
+
+        json.put("json", "{\"mainContainer\": [{\"array\":[]}, {\"array\":[{\"field\":\"string\"}]}]}");
+        final SinkRecord record = new SinkRecord("test", 0, null, null, schema, json, 0);
+        final SinkRecord transformedRecord = xform.apply(record);
+
+        final Struct updatedValue = (Struct) transformedRecord.value();
+        assertEquals(ConnectSchema.STRING_SCHEMA.type().getName(), transformedRecord.valueSchema().field("json").schema().field("mainContainer").schema().valueSchema().field("array").schema().valueSchema().field("field").schema().type().getName());
+        assertEquals(2, updatedValue.getStruct("json").getArray("mainContainer").size());
+    }
+
+    @Test
+    public void arrayOfObjectsFirst() {
+        final Map<String, String> props = new HashMap<>();
+        props.put("sourceFields", "json");
+
+        xform.configure(props);
+
+        final Schema schema = SchemaBuilder.struct()
+                .field("json", SchemaBuilder.string());
+
+        final Struct json = new Struct(schema);
+
+        json.put("json", "{\"mainContainer\": [{\"array\":[{\"field\":\"string\"}]}, {\"array\":[]}]}");
+        final SinkRecord record = new SinkRecord("test", 0, null, null, schema, json, 0);
+        final SinkRecord transformedRecord = xform.apply(record);
+
+        final Struct updatedValue = (Struct) transformedRecord.value();
+        assertEquals(ConnectSchema.STRING_SCHEMA.type().getName(), transformedRecord.valueSchema().field("json").schema().field("mainContainer").schema().valueSchema().field("array").schema().valueSchema().field("field").schema().type().getName());
+        assertEquals(2, updatedValue.getStruct("json").getArray("mainContainer").size());
+    }
+
+    @Test
+    public void emptyArrayFirstAndLast() {
+        final Map<String, String> props = new HashMap<>();
+        props.put("sourceFields", "json");
+
+        xform.configure(props);
+
+        final Schema schema = SchemaBuilder.struct()
+                .field("json", SchemaBuilder.string());
+
+        final Struct json = new Struct(schema);
+
+        json.put("json", "{\"mainContainer\": [{\"array\":[{\"array\":[]}, {\"field\":\"string\"}]}, {\"array\":[]}]}");
+        final SinkRecord record = new SinkRecord("test", 0, null, null, schema, json, 0);
+        final SinkRecord transformedRecord = xform.apply(record);
+
+        final Struct updatedValue = (Struct) transformedRecord.value();
+        assertEquals(ConnectSchema.STRING_SCHEMA.type().getName(), transformedRecord.valueSchema().field("json").schema().field("mainContainer").schema().valueSchema().field("array").schema().valueSchema().field("field").schema().type().getName());
+        assertEquals(2, updatedValue.getStruct("json").getArray("mainContainer").size());
     }
 }
