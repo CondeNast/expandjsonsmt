@@ -117,13 +117,13 @@ class SchemaParser {
     }
 
     private static Schema getArrayMemberSchema(BsonArray bsonArr, boolean lastPass) {
-        if (lastPass) {
+        /*if (lastPass) {
             if (bsonArr.isEmpty()) {
                 return Schema.OPTIONAL_STRING_SCHEMA;
             }
-        }
+        }*/
         if (bsonArr.isEmpty()) {
-            return null;
+            return Schema.OPTIONAL_STRING_SCHEMA;
         }
 
         final BsonValue elementSample = getArrayElement(bsonArr);
@@ -163,7 +163,7 @@ class SchemaParser {
             }
 
             for(Entry<String, BsonValue> entry : element.asDocument().entrySet()) {
-                if (builder.field(entry.getKey()) == null) {
+                if (builder.field(entry.getKey()) == null || builder.field(entry.getKey()) == Schema.OPTIONAL_STRING_SCHEMA) {
 
                     addFieldSchema(entry, builder, lastPass);
                 }

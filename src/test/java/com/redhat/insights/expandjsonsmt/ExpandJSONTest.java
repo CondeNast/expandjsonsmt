@@ -156,14 +156,14 @@ public class ExpandJSONTest {
 
         final Schema schema = SchemaBuilder.struct().field("obj", Schema.STRING_SCHEMA).build();
         final Struct value = new Struct(schema);
-        value.put("obj","{\"null\": {\"uIczQ\": []}}");
+        value.put("obj","{\"testBad\": {\"uIczQ\": []}}");
 
         final SinkRecord record = new SinkRecord("test", 0, null, null, schema, value, 0);
         final SinkRecord transformedRecord = xform.apply(record);
 
         final Struct updatedValue = (Struct) transformedRecord.value();
-        assertNotNull(updatedValue.getStruct("obj").getStruct("null"));
-        assertEquals(0, updatedValue.getStruct("obj").getStruct("null").getArray("uIczQ").size());
+        assertNotNull(updatedValue.getStruct("obj").getStruct("testBad"));
+        assertEquals(0, updatedValue.getStruct("obj").getStruct("testBad").getArray("uIczQ").size());
     }
 
     @Test
