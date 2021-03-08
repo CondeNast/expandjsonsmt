@@ -351,12 +351,55 @@ public class ExpandJSONTest {
 
         final Struct json = new Struct(schema);
 
-        json.put("json", "{\"mainContainer\": [{\"array\":[{\"array\":[]}, {\"field\":\"string\"}]}, {\"array\":[]}]}");
+        json.put("json", "{\"mainContainer\": [{\"array\":[]}, {\"array\":[{\"field\":\"string\"}]}, {\"array\":[]}]}");
         final SinkRecord record = new SinkRecord("test", 0, null, null, schema, json, 0);
         final SinkRecord transformedRecord = xform.apply(record);
 
         final Struct updatedValue = (Struct) transformedRecord.value();
         assertEquals(ConnectSchema.STRING_SCHEMA.type().getName(), transformedRecord.valueSchema().field("json").schema().field("mainContainer").schema().valueSchema().field("array").schema().valueSchema().field("field").schema().type().getName());
-        assertEquals(2, updatedValue.getStruct("json").getArray("mainContainer").size());
+        assertEquals(3, updatedValue.getStruct("json").getArray("mainContainer").size());
+    }
+
+    @Test
+    public void emptyArrayInRoot() {
+        final Map<String, String> props = new HashMap<>();
+        props.put("sourceFields", "json");
+
+        xform.configure(props);
+
+        final Schema schema = SchemaBuilder.struct()
+                .field("json", SchemaBuilder.string());
+
+        final Struct json = new Struct(schema);
+
+        json.put("json", "[]");
+        final SinkRecord record = new SinkRecord("test", 0, null, null, schema, json, 0);
+        final SinkRecord transformedRecord = xform.apply(record);
+
+        final Struct updatedValue = (Struct) transformedRecord.value();
+        // assertEquals(ConnectSchema.STRING_SCHEMA.type().getName(), transformedRecord.valueSchema().field("json").schema().field("mainContainer").schema().valueSchema().field("array").schema().valueSchema().field("field").schema().type().getName());
+        assertEquals(0, updatedValue.getStruct("json").getArray("array").size());
+        // assertEquals(2, updatedValue.getStruct("json").getArray("mainContainer").size());
+    }
+
+    @Test
+    public void emptyArrayInSubRoot() {
+        final Map<String, String> props = new HashMap<>();
+        props.put("sourceFields", "json");
+
+        xform.configure(props);
+
+        final Schema schema = SchemaBuilder.struct()
+                .field("json", SchemaBuilder.string());
+
+        final Struct json = new Struct(schema);
+
+        json.put("json", "{\"mainContainer\": []}");
+        final SinkRecord record = new SinkRecord("test", 0, null, null, schema, json, 0);
+        final SinkRecord transformedRecord = xform.apply(record);
+
+        final Struct updatedValue = (Struct) transformedRecord.value();
+        // assertEquals(ConnectSchema.STRING_SCHEMA.type().getName(), transformedRecord.valueSchema().field("json").schema().field("mainContainer").schema().valueSchema().field("array").schema().valueSchema().field("field").schema().type().getName());
+        updatedValue.getStruct("json").getArray("mainContainer").size();
     }
 }

@@ -23,15 +23,31 @@ class SchemaParser {
      * @param doc Parsed document or null.
      */
     static Schema bsonDocument2Schema(BsonDocument doc) {
-        return bsonDocument2SchemaBuilder(doc, false).build();
+        return bsonDocument2SchemaBuilder(doc).build();
     }
 
-    private static SchemaBuilder bsonDocument2SchemaBuilder(BsonDocument doc, boolean lastPass) {
+    private static SchemaBuilder bsonDocument2SchemaBuilder(BsonDocument doc) {
         final SchemaBuilder schemaBuilder = SchemaBuilder.struct().optional();
         if (doc != null) {
             for(Entry<String, BsonValue> entry : doc.entrySet()) {
+                final BsonValue bsonValue = entry.getValue();
+                boolean lastPass = false;
+                if (bsonValue.isArray()) {
+                    if (bsonValue.asArray().size() <= 1) {
+                        lastPass = true;
+                    }
+                }
                 addFieldSchema(entry, schemaBuilder, lastPass);
             }
+        }
+
+        return schemaBuilder;
+    }
+
+    private static SchemaBuilder bsonArray2SchemaBuilder(BsonDocument doc, boolean lastPass) {
+        final SchemaBuilder schemaBuilder = SchemaBuilder.struct().optional();
+        for(Entry<String, BsonValue> entry : doc.entrySet()) {
+            addFieldSchema(entry, schemaBuilder, lastPass);
         }
 
         return schemaBuilder;
@@ -117,13 +133,14 @@ class SchemaParser {
     }
 
     private static Schema getArrayMemberSchema(BsonArray bsonArr, boolean lastPass) {
-        /*if (lastPass) {
+        if (lastPass) {
             if (bsonArr.isEmpty()) {
                 return Schema.OPTIONAL_STRING_SCHEMA;
             }
-        }*/
+        }
         if (bsonArr.isEmpty()) {
-            return Schema.OPTIONAL_STRING_SCHEMA;
+            return null;
+            // return Schema.OPTIONAL_STRING_SCHEMA;
         }
 
         final BsonValue elementSample = getArrayElement(bsonArr);
@@ -158,12 +175,14 @@ class SchemaParser {
             }
 
             if (builder == null) {
-                builder = bsonDocument2SchemaBuilder(element.asDocument(), lastPass);
+                builder = bsonArray2SchemaBuilder(element.asDocument(), lastPass);
                 continue;
             }
 
             for(Entry<String, BsonValue> entry : element.asDocument().entrySet()) {
-                if (builder.field(entry.getKey()) == null || builder.field(entry.getKey()) == Schema.OPTIONAL_STRING_SCHEMA) {
+                // Field builderField = builder.field(entry.getKey());
+                // if (builderField == null || builderField.schema().valueSchema().equals(Schema.OPTIONAL_STRING_SCHEMA)) {
+                if (builder.field(entry.getKey()) == null) {
 
                     addFieldSchema(entry, builder, lastPass);
                 }
